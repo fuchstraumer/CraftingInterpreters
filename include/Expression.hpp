@@ -28,13 +28,14 @@ struct SourceLocation
 
 struct Expression
 {
-    Expression() = default;
-    ~Expression() = default;
+    Expression() noexcept = default;
+    ~Expression() noexcept = default;
+    Expression(const Expression&) noexcept = default;
+    Expression(Expression&&) noexcept = default;
+    Expression& operator=(const Expression&) noexcept = default;
+    Expression& operator=(Expression&&) noexcept = default;
     SourceLocation loc;
 };
-
-template<typename T>
-concept ConvertibleToString = std::is_convertible_v<T, std::string>;
 
 // lowest to highest
 enum class PrecedenceLevel
@@ -50,27 +51,36 @@ enum class PrecedenceLevel
 
 struct NumericLiteralExpression : public Expression
 {
+    explicit NumericLiteralExpression(float val) noexcept : value{ val } {}
     float value{ std::numeric_limits<float>::max() };
 };
 
 struct StringLiteralExpression : public Expression
 {
+    explicit StringLiteralExpression(std::string_view sv) noexcept :
+        value{ sv } {}
     std::string value{};
 };
 
 struct IdentifierLiteralExpression : public Expression
 {
+    explicit IdentifierLiteralExpression(std::string_view sv) noexcept :
+        identifier{ sv } {}
     std::string identifier{};
 };
 
 struct UnaryExpression : public Expression
 {
+    explicit UnaryExpression(LoxToken op, Expression _rhs) noexcept :
+        operatorToken(std::move(op)), rhs(std::move(_rhs)) {}
     LoxToken operatorToken;
     Expression rhs;
 };
 
 struct BinaryExpression : public Expression
 {
+    explicit BinaryExpression(Expression _lhs, LoxToken op, Expression _rhs) noexcept :
+        lhs(std::move(_lhs)), operatorToken(std::move(op)), rhs(std::move(_rhs)) {}
     Expression lhs;
     LoxToken operatorToken;
     Expression rhs;
