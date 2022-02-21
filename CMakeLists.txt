@@ -21,7 +21,9 @@ set(LoxInterpreterTestSources
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/LexerTests.cpp")
 
 add_executable(LoxInterpreterBasic ${LoxInterpreterBasicSources} ${LoxInterpreterTestSources})
-target_include_directories(LoxInterpreterBasic PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(LoxInterpreterBasic PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
 if (MSVC)
     target_compile_options(LoxInterpreterBasic PRIVATE "/std:c++latest" "/JMC")
