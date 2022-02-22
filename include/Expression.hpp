@@ -86,6 +86,19 @@ struct BinaryExpression : public Expression
     Expression rhs;
 };
 
+struct LanguageLiteralExpression : public Expression
+{
+    explicit LanguageLiteralExpression(TokenType _type, LoxToken _literal) noexcept :
+        type(_type), literal(_literal) {}
+    TokenType type;
+    LoxToken literal;
+};
+
+struct GroupingExpression : public Expression
+{
+    Expression group;
+};
+
 template<typename T>
 concept IsExpressionType = std::is_base_of_v<Expression, T>;
 
