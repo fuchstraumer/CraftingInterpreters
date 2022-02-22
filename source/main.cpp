@@ -1,4 +1,4 @@
-#include "tests/LexerTests.hpp"
+#include "../tests/LexerTests.hpp"
 #include <iostream>
 #include <string_view>
 
@@ -8,6 +8,5 @@ int main(int argc, char* argv[])
 {
     std::string_view results = RunBasicLexerTests();
     std::cerr << results;
-    UnaryExpression expr;
     return 0;
 }

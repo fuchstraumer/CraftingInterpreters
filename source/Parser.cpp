@@ -1,10 +1,5 @@
 #include "Parser.hpp"
 
-namespace
-{
-    
-}
-
 Parser::Parser(const std::vector<LoxToken>& _tokens) : tokens(_tokens) {}
 
 Expression Parser::expression(Parser::TokenIter iter) const
@@ -14,17 +9,145 @@ Expression Parser::expression(Parser::TokenIter iter) const
 
 Expression Parser::equality(Parser::TokenIter iter) const
 {
-    // get first comparator
-    Expression expr = comparison(iter);
-    // now a while loop to follow down
+    const static std::vector<TokenType> equalityTokens
+    {
+        TokenType::EqualEqual,
+        TokenType::LogicalNotEqual
+    };
 
-    return expr;
+    Expression lhs = comparison(iter);
+    Expression result;
+
+    // now a while loop to follow down
+    while (match(equalityTokens, iter))
+    {
+        LoxToken operatorToken = previous(iter);
+        Expression rhs = comparison(iter);
+        result = BinaryExpression{ lhs, operatorToken, rhs };
+    }
+
+    return result;
 }
 
 Expression Parser::comparison(TokenIter iter) const
 {
-    return Expression();
+    const static std::vector<TokenType> comparisonTokens
+    {
+        TokenType::Greater,
+        TokenType::GreaterEqual,
+        TokenType::Less,
+        TokenType::LessEqual
+    };
+
+    Expression lhs = term(iter);
+    Expression result = lhs;
+    
+    while (match(comparisonTokens, iter))
+    {
+        LoxToken operatorToken = previous(iter);
+        Expression rhs = term(iter);
+        result = BinaryExpression{ lhs, operatorToken, rhs };
+    }
+
+    return result;
 }
+
+Expression Parser::term(TokenIter iter) const
+{
+    const static std::vector<TokenType> termTokens
+    {
+        TokenType::Minus,
+        TokenType::Plus
+    };
+
+    Expression lhs = factor(iter);
+    Expression result = lhs;
+
+    while (match(termTokens, iter))
+    {
+        LoxToken operatorToken = previous(iter);
+        Expression rhs = factor(iter);
+        result = BinaryExpression{ lhs, operatorToken, rhs };
+    }
+
+    return result;
+}
+
+Expression Parser::factor(TokenIter iter) const
+{
+    const static std::vector<TokenType> factorTokens
+    {
+        TokenType::Slash,
+        TokenType::Star
+    };
+
+    Expression lhs = unary(iter);
+    Expression result = lhs;
+
+    while (match(factorTokens, iter))
+    {
+        LoxToken operatorToken = previous(iter);
+        Expression rhs = unary(iter);
+        result = BinaryExpression{ lhs, operatorToken, rhs };
+    }
+
+    return result;
+}
+
+Expression Parser::unary(TokenIter iter) const
+{
+    const static std::vector<TokenType> unaryTokens
+    {
+        TokenType::LogicalNot,
+        TokenType::Minus
+    };
+
+    if (match(unaryTokens, iter))
+    {
+        LoxToken operatorToken = previous(iter);
+        Expression rhs = unary(iter);
+        return UnaryExpression{ operatorToken, rhs };
+    }
+
+    return primary(iter);
+}
+
+Expression Parser::primary(TokenIter iter) const
+{
+    if (match({ TokenType::False }, iter))
+    {
+        return LanguageLiteralExpression{ TokenType::False, *iter };
+    }
+    else if (match({ TokenType::True }, iter))
+    {
+        return LanguageLiteralExpression{ TokenType::True, *iter };
+    }
+    else if (match({ TokenType::Nil }, iter))
+    {
+        return LanguageLiteralExpression{ TokenType::Nil, *iter };
+    }
+    else if (match({ TokenType::NumberLiteral }, iter))
+    {
+        return NumericLiteralExpression{ iter->numericLiteral };
+    }
+    else if (match({ TokenType::StringLiteral }, iter))
+    {
+        return StringLiteralExpression{ iter->strLiteral };
+    }
+    else if (match({ TokenType::LeftParen }, iter))
+    {
+        Expression expr = expression(iter);
+        consume(TokenType::RightParen, "Expected a ')' after expression.");
+        return GroupingExpression{ expr };
+    }
+    else
+    {
+        // uh oh
+        throw std::runtime_error("Oops");
+    }
+}
+
+
 
 bool Parser::isAtEnd(TokenIter iter) const noexcept
 {
@@ -36,33 +159,43 @@ bool Parser::isAtEnd(TokenIter iter) const noexcept
     {
         if (iter == tokens.cend())
         {
-            
+            // error? we shouldn't be able to do this. means
+            // scanner didn't generate/find valid EOF token
         }
         return false;
     }
-}
-
-bool Parser::checkToken(TokenIter iter, TokenType type) const noexcept
-{
-    return false;
 }
 
 const LoxToken& Parser::advance(TokenIter iter) const noexcept
 {
     if (!isAtEnd(iter))
     {
-        return *iter;
+        ++iter;
     }
-
-    return *iter;
+    
+    return previous(iter);
 }
 
 const LoxToken& Parser::previous(TokenIter iter) const noexcept
 {
-    return *iter;
+    TokenIter prevIter = iter - 1;
+    return *prevIter;
 }
 
-const LoxToken& Parser::peek(TokenIter iter) const noexcept
+bool Parser::match(const std::vector<TokenType>& types, TokenIter iter) const noexcept
 {
-    return *iter;
+    for (const auto& tokenType : types)
+    {
+        if (tokenType == iter->type)
+        {
+            advance(iter);
+            return true;
+        }
+    }
+    return false;
+}
+
+void Parser::consume(TokenType type, std::string failureString) const
+{
+
 }

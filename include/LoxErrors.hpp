@@ -56,7 +56,11 @@ enum class LoxCompilerErrorCode : int
     UnknownError = 80,
 
     ParserError = 120,
-    
+    ExpectedTokenNotFound,
+    UnclosedBrackets,
+    UnclosedParentheses,
+    InvalidTokenOrdering,
+    MissingPrimaryToken,
 
     // Start of failures coming from tests
     TestFailError = 160,
