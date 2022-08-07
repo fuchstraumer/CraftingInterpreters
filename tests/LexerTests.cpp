@@ -2,6 +2,7 @@
 #include "LoxErrors.hpp"
 #include "Token.hpp"
 #include "Lexer.hpp"
+#include "Utility.hpp"
 #include <format>
 #include <sstream>
 #include <vector>
@@ -62,60 +63,11 @@ std::array<LoxToken, 11> VarsAndLiteralsTestTokens
     LoxToken{ TokenType::EndOfFile, 3, 0 }
 };
 
-std::unordered_map<TokenType, std::string> tokenStrings
-{
-    { TokenType::Invalid, "Invalid" },
-    { TokenType::LeftParen, "Left Parentheses" },
-    { TokenType::RightParen, "Right Parentheses" },
-    { TokenType::LeftBrace, "Left Bracket" },
-    { TokenType::RightBrace, "Right Bracket" },
-    { TokenType::Comma, "Comma" },
-    { TokenType::Dot, "Dot" },
-    { TokenType::Minus, "Minus" },
-    { TokenType::Plus, "Plus" },
-    { TokenType::Semicolon, "Semicolon" },
-    { TokenType::Slash, "Slash" },
-    { TokenType::Star, "Star" },
-    { TokenType::LogicalNot, "Logical Not (!)" },
-    { TokenType::LogicalNotEqual, "Logical Not Equal (!=)" },
-    { TokenType::Equal, "Equal" },
-    { TokenType::EqualEqual, "Equality Operator (==)" },
-    { TokenType::Greater, "Greater" },
-    { TokenType::GreaterEqual, "Greater-Equal" },
-    { TokenType::Less, "Less" },
-    { TokenType::LessEqual, "Less-Equal" },
-    // literals
-    { TokenType::Identifier, "Identifier" },
-    { TokenType::StringLiteral, "String Literal" },
-    { TokenType::NumberLiteral, "Numeric Literal" },
-    // special items
-    { TokenType::CommentBegin, "Comment Begin (//)" },
-    { TokenType::CommentString, "Comment String" },
-    { TokenType::EndOfFile, "End-Of-File" },
-    // keywords
-    { TokenType::And, "And" },
-    { TokenType::Class, "Class" },
-    { TokenType::Else, "Else" },
-    { TokenType::False, "False" },
-    { TokenType::Fun, "Fun" },
-    { TokenType::For, "For" },
-    { TokenType::If, "If" },
-    { TokenType::Nil, "Nil" },
-    { TokenType::Or, "Or" },
-    { TokenType::Print, "Print" },
-    { TokenType::Return, "Return" },
-    { TokenType::Super, "Super" },
-    { TokenType::This, "This" },
-    { TokenType::True, "True" },
-    { TokenType::Var, "Var" },
-    { TokenType::While, "While" },
-};
-
 std::string GetTokenString(const size_t idx, const LoxToken& token)
 {
     std::string result;
     result += "IDX: " + std::to_string(idx) + " | ";
-    result += "Type: " + tokenStrings.at(token.type) + " | ";
+    result += "Type: " + std::string(TokenTypeToString(token.type)) + " | ";
     result += "Line: " + std::to_string(token.line) + " | ";
     result += "Column: " + std::to_string(token.offset) + " | ";
     if (!token.strLiteral.empty())
