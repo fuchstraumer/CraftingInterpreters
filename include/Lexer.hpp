@@ -23,6 +23,7 @@ public:
     // Returns size_t handle 
     OutputHandle ParseScript(std::string sourceStr);
     void GetTokensForHandle(const OutputHandle handle, size_t& numTokens, LoxToken* tokensDest);
+    static void SetAllowableErrorCount(size_t count);
 
 private:
 
@@ -37,6 +38,8 @@ private:
     void extractKeywordOrIdentifier(
         std::string_view& line,
         LoxScanSession& session);
+
+    static size_t s_allowableErrorCount;
 };
 
 

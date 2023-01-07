@@ -111,16 +111,52 @@ namespace
     {
         // TokenType::KeywordsEndRange is itself a valid value, it's "while"
         return (type > TokenType::KeywordsBeginRange) &&
-            (type <= TokenType::KeywordsEndRange);
+               (type <= TokenType::KeywordsEndRange);
     }
+
+    // For error handling, we want to extract the broken str as best as we can. 
+    // Can be a little sloppy since this isn't meant to be fast, things are already broken!
+    constexpr std::string_view findEndOfBrokenStrLiteral(const std::string_view& sv)
+    {
+        size_t spaceEndsStrLiteral = sv.find_first_of(' ');
+        if (spaceEndsStrLiteral != std::string_view::npos)
+        {
+            return sv.substr(0, spaceEndsStrLiteral);
+        }
+
+        size_t semicolonEndsStrLiteral = sv.find_first_of(';');
+        if (semicolonEndsStrLiteral != std::string_view::npos)
+        {
+            return sv.substr(0, semicolonEndsStrLiteral);
+        }
+
+        size_t newlineEndsStrLiteral = sv.find_first_of('\n');
+        if (newlineEndsStrLiteral != std::string_view::npos)
+        {
+            return sv.substr(0, newlineEndsStrLiteral);
+        }
+
+        // god, i hope not, but also line endings weird. better safe than sorry.
+        size_t returnEndsStrLiteral = sv.find_first_of('\r');
+        if (returnEndsStrLiteral != std::string_view::npos)
+        {
+            return sv.substr(0, returnEndsStrLiteral);
+        }
+
+        return sv;
+    }
+
 }
+
+size_t Lexer::s_allowableErrorCount = k_maxErrorsInScanSession;
 
 struct LoxScannerErrorInfo
 {
     LoxCompilerErrorCode errorCode = static_cast<LoxCompilerErrorCode>(0);
     size_t line = 0;
     size_t offset = 0;
-    std::string_view str;
+    std::string_view lineStr;
+    std::string_view errorItemStr;
 };
 
 struct LoxScanSession
@@ -218,9 +254,17 @@ struct LoxScanSession
         offsetInCurrentLine += identifier.length();
     }
 
-    void addError(LoxCompilerErrorCode ec, std::string_view line)
+    void addError(LoxCompilerErrorCode ec, std::string_view line, std::string_view substr)
     {
-        errors.emplace_back(ec, currentLineNumber, offsetInCurrentLine, line);
+        errors.emplace_back(ec, currentLineNumber, offsetInCurrentLine, line, substr);
+        // if substr is empty, that's a case we cleared "line" anyways so this being invalid is fine
+        offsetInCurrentLine += substr.length();
+    }
+
+    void advanceToNextLine()
+    {
+        offsetInCurrentLine = 0;
+        ++currentLineNumber;
     }
 };
 
@@ -236,8 +280,6 @@ std::string_view readLine(LoxScanSession& input)
 
     const size_t firstNewline = input.sourceTextView.find_first_of('\n');
     const size_t firstReturn = input.sourceTextView.find_first_of('\r');
-    ++input.line;
-
     
     // Catch cases where current line only contains a newline character or two
     if (firstNewline == 0 || firstReturn == 0)
@@ -290,20 +332,18 @@ size_t Lexer::ParseScript(std::string sourceStr)
         {
             // empty lines still affect line count, incorrect line
             // count would result in confusing debugging
-            session.currentLineNumber += 1;
+            session.advanceToNextLine();
             continue;
         }
 
         processLine(currentLine, session);
 
-        if (session.errors.size() > k_maxErrorsInScanSession)
+        if (session.errors.size() > Lexer::s_allowableErrorCount)
         {
             throw std::runtime_error("Surpassed max error count");
         }
 
-        session.currentLineNumber += 1;
-        // reset offset in line for new line
-        session.offsetInCurrentLine = 0;
+        session.advanceToNextLine();
     }
 
     session.finalize();
@@ -327,6 +367,11 @@ void Lexer::GetTokensForHandle(const Lexer::OutputHandle handle, size_t& numToke
     {
         numTokens = 0u;
     }
+}
+
+void Lexer::SetAllowableErrorCount(size_t count)
+{
+    Lexer::s_allowableErrorCount = count;
 }
 
 void Lexer::processLine(std::string_view currentLine, LoxScanSession& session)
@@ -380,10 +425,9 @@ void Lexer::processLine(std::string_view currentLine, LoxScanSession& session)
         }
 
         // Reached here, means our current character isn't being processed at all
-        session.addError(LoxCompilerErrorCode::UnrecognizedLexeme, currentLine);
-        if (session.errors.size() > k_maxErrorsInScanSession)
+        session.addError(LoxCompilerErrorCode::UnrecognizedLexeme, currentLine, currentLine.substr(0, 1));
+        if (session.errors.size() > Lexer::s_allowableErrorCount)
         {
-            std::cerr << "Reached error limit when parsing, likely bad character in stream.";
             throw std::runtime_error("Reached error limit!");
         }
     }
@@ -406,7 +450,7 @@ void Lexer::extractDualCharToken(std::string_view& line, const char firstChar, L
         secondChar == '/' ? session.addSingleLineCommentToken(line) : session.addToken(TokenType::Slash, 1u, line);
         break;
     default:
-        session.addError(LoxCompilerErrorCode::UnrecognizedLexeme, line);
+        session.addError(LoxCompilerErrorCode::UnrecognizedDualCharacterLexeme, line, line.substr(0, 2));
         // erase this line, because at the least the line is trashed
         line.remove_prefix(line.size());
         break;
@@ -419,7 +463,8 @@ void Lexer::extractStringLiteral(std::string_view& line, LoxScanSession& session
     const size_t endOfLiteral = line.find_first_of('"', 1u);
     if (endOfLiteral == std::string_view::npos)
     {
-        session.addError(LoxCompilerErrorCode::StringLiteralMissingEndQuote, line);
+        std::string_view extractedLiteral = findEndOfBrokenStrLiteral(line);
+        session.addError(LoxCompilerErrorCode::StringLiteralMissingEndQuote, line, extractedLiteral);
         // make the line empty by creating a default ctor empty one
         // breaks from loop, since this error completely trashes the line
         line = std::string_view{};
@@ -445,9 +490,11 @@ void Lexer::extractNumericLiteral(std::string_view& line, LoxScanSession& sessio
         endOfNumLiteral = line.find_first_of(';');
         if (endOfNumLiteral == std::string_view::npos)
         {
-            // now we're cooked. add relevant error, continue to next
-            // line 
-            session.addError(LoxCompilerErrorCode::NumericLiteralParseFailure, line);
+            // now we're cooked. add relevant error, continue to next line. really can't extract something here,
+            // so we can't even really clear the line well and continue with errors. clear the line and move on
+            session.addError(LoxCompilerErrorCode::NumericLiteralParseFailure, line, std::string_view{});
+            line = std::string_view{};
+            return;
         }
     }
 
@@ -460,7 +507,7 @@ void Lexer::extractNumericLiteral(std::string_view& line, LoxScanSession& sessio
     }
     else
     {
-        session.addError(LoxCompilerErrorCode::NumericLiteralConversionFailure, line);
+        session.addError(LoxCompilerErrorCode::NumericLiteralConversionFailure, line, line.substr(0, endOfNumLiteral));
         line = std::string_view{};
     }
 }
@@ -472,8 +519,7 @@ void Lexer::extractKeywordOrIdentifier(std::string_view& line, LoxScanSession& s
     if (endIter != line.end())
     {
         std::string_view token = std::string_view{ line.begin(), endIter };
-        // see if token matches potential keywords, otherwise it is
-        // an identifier
+        // see if token matches potential keywords, otherwise it is an identifier
         auto keywordTokenIter = k_keywordTokenTypeMap.find(token);
         if (keywordTokenIter != k_keywordTokenTypeMap.end())
         {
@@ -484,6 +530,7 @@ void Lexer::extractKeywordOrIdentifier(std::string_view& line, LoxScanSession& s
                 const TokenType lastTokenType = session.tokens.back().type;
                 validToAddKeyword = !IsKeywordTokenType(lastTokenType);
             }
+
             // Should be valid in most cases, but this helps us catch potential errors
             if (validToAddKeyword)
             {
@@ -491,10 +538,10 @@ void Lexer::extractKeywordOrIdentifier(std::string_view& line, LoxScanSession& s
             }
             else
             {
-                // last token added was a keyword, and in lox this invalid
+                // last token added was a keyword, and in lox this is invalid
                 // behavior that won't work. log the error. likely
                 // that the user tried to do (keyword) (identifier)
-                session.addError(LoxCompilerErrorCode::InvalidKeywordUsage, line);
+                session.addError(LoxCompilerErrorCode::InvalidKeywordUsage, line, token);
                 const size_t keywordLen = k_keywordLengthMap.at(keywordTokenIter->second);
                 line.remove_prefix(keywordLen);
             }
@@ -508,7 +555,7 @@ void Lexer::extractKeywordOrIdentifier(std::string_view& line, LoxScanSession& s
     }
     else
     {
-        session.addError(LoxCompilerErrorCode::TokenExtractionFailed, line);
+        session.addError(LoxCompilerErrorCode::TokenExtractionFailed, line, std::string_view{});
         line = std::string_view{};
     }
 }

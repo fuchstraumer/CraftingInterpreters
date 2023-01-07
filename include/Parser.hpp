@@ -8,9 +8,9 @@
 
 struct ParseError : public std::runtime_error
 {
+    ParseError(LoxCompilerErrorCode ec, LoxToken token) noexcept;
     LoxCompilerErrorCode errorCode;
     LoxToken token;
-    const char* what() const noexcept final;
 };
 
 class Parser
@@ -24,7 +24,6 @@ public:
 private:
     std::vector<LoxToken> tokens;
     using TokenIter = decltype(tokens)::const_iterator;
-    
 
     Expression expression(TokenIter iter) const;
     Expression equality(TokenIter iter) const;
@@ -34,7 +33,7 @@ private:
     Expression unary(TokenIter iter) const;
     Expression primary(TokenIter iter) const;
 
-    bool isAtEnd(TokenIter iter) const noexcept;
+    bool isAtEnd(TokenIter iter) const;
     const LoxToken& advance(TokenIter iter) const noexcept;
     const LoxToken& previous(TokenIter iter) const noexcept;
     const LoxToken& peek(TokenIter iter) const noexcept;

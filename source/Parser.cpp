@@ -1,5 +1,27 @@
 #include "Parser.hpp"
 
+std::string getParseErrorString(LoxCompilerErrorCode errorCode) noexcept
+{
+    switch (errorCode)
+    {
+    case LoxCompilerErrorCode::ExpectedTokenNotFound:
+        return "Expected token not found";
+    case LoxCompilerErrorCode::UnclosedBrackets:
+        return "Unclosed brackets found";
+    case LoxCompilerErrorCode::UnclosedParentheses:
+        return "Unclosed parentheses found";
+    case LoxCompilerErrorCode::InvalidTokenOrdering:
+        return "Invalid token ordering";
+    case LoxCompilerErrorCode::MissingPrimaryToken:
+        return "Missing primary token";
+    default:
+        return "Invalid error code for ParseError class";
+    }
+}
+
+ParseError::ParseError(LoxCompilerErrorCode ec, LoxToken _token) noexcept :
+    errorCode(ec), token(_token), std::runtime_error(getParseErrorString(ec)) {}
+
 Parser::Parser(const std::vector<LoxToken>& _tokens) : tokens(_tokens) {}
 
 Expression Parser::expression(Parser::TokenIter iter) const
@@ -147,9 +169,7 @@ Expression Parser::primary(TokenIter iter) const
     }
 }
 
-
-
-bool Parser::isAtEnd(TokenIter iter) const noexcept
+bool Parser::isAtEnd(TokenIter iter) const
 {
     if (iter != tokens.cend() && iter->type == TokenType::EndOfFile)
     {
@@ -161,6 +181,7 @@ bool Parser::isAtEnd(TokenIter iter) const noexcept
         {
             // error? we shouldn't be able to do this. means
             // scanner didn't generate/find valid EOF token
+            throw ParseError(LoxCompilerErrorCode::MissingEOF, LoxToken());
         }
         return false;
     }

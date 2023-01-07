@@ -36,11 +36,11 @@ enum class LoxCompilerErrorCode : int
     // 0 is reserved for compatability with std::error_code
     // Initial range of values all maps to BadUserInput source: root cause of this is incorrect user input
     ForbiddenToken = 1,
-    // Singular lexeme that couldn't be matched to valid set of lexemes
-    UnrecognizedLexeme,
-    ReservedWord,
+    UnrecognizedLexeme, // Singular lexeme that couldn't be matched to valid set of lexemes
+    UnrecognizedDualCharacterLexeme, // Specialized error code, so that we know to print out/handle a dual character lexeme error :)
+    ReservedWord, // current token uses a language keyword or reserved word
     InvalidInputString,
-    StringLiteralMissingEndQuote,
+    StringLiteralMissingEndQuote, // no end quotation, can't create a valid string literal at all
     NumericLiteralParseFailure, // couldn't extract literal from string
     NumericLiteralConversionFailure, // conversion of literal to result num failed
     InvalidKeywordUsage, // keyword followed by keyword, usually
@@ -61,6 +61,7 @@ enum class LoxCompilerErrorCode : int
     UnclosedParentheses,
     InvalidTokenOrdering,
     MissingPrimaryToken,
+    MissingEOF,
 
     // Start of failures coming from tests
     TestFailError = 160,
