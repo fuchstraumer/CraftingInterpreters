@@ -12,7 +12,6 @@
 #include <unordered_map>
 #include <string>
 
-
 /*
 
     TEST CONTENT
@@ -66,7 +65,7 @@ const char* BrokenErrorHandlingTestSource =
 R"(
 var BrokenStrLiteral = "Test!;
 var BrokenNumericLiteral = 1.23,4;
-var While = 3;
+var while = 3;
 )";
 
 
@@ -298,7 +297,7 @@ std::string_view RunBasicLexerTests()
     }
 
     // Drop this, so we can do our error handling and printing tests
-    Lexer::SetAllowableErrorCount(3u);
+    Lexer::SetAllowableErrorCount(2u);
 
     try
     {
@@ -307,6 +306,7 @@ std::string_view RunBasicLexerTests()
     catch (const std::runtime_error& error)
     {
         std::cerr << "Yay it broke\n";
+        std::cerr << error.what() << "\n";
     }
 
     return std::string_view{};
