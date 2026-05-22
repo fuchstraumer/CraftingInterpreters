@@ -291,12 +291,18 @@ std::string_view readLine(LoxScanSession& input)
     else if (firstReturn != std::string::npos)
     {
         resultView = input.sourceTextView.substr(0, firstReturn);
+        input.sourceTextView.remove_prefix(firstReturn + 1);
+    }
+    else if (firstNewline != std::string::npos)
+    {
+        resultView = input.sourceTextView.substr(0, firstNewline);
         input.sourceTextView.remove_prefix(firstNewline + 1);
     }
     else
     {
-        resultView = input.sourceTextView.substr(0, firstNewline);
-        input.sourceTextView.remove_prefix(firstNewline + 1);
+        // nothing captured, return empty view? propagate errors? this shouldn't occur so likely indicates
+        // malformed input of some kind
+        return resultView;
     }
 
     return resultView;
@@ -500,15 +506,19 @@ void Lexer::extractNumericLiteral(std::string_view& line, LoxScanSession& sessio
 
     float convertedLiteral = 0.0f;
     std::from_chars_result convertResult = std::from_chars(&line[0], &line[endOfNumLiteral], convertedLiteral);
-    
-    if (static_cast<int>(convertResult.ec) == 0)
+    // If we just check EC, we can have cases where a literal is extracted correctly from an invalid numeric literal
+    //string - from_chars failsafes into only parsing what it can. Compare returned data pointer to where we expect
+    // it to be given endOfNumLiteral to catch this case
+    const bool incorrectParseOfInvalidLiteral = convertResult.ptr != &line[endOfNumLiteral];
+    if (incorrectParseOfInvalidLiteral || (static_cast<int>(convertResult.ec) != 0))
     {
-        session.addNumLiteralToken(line, convertedLiteral, endOfNumLiteral);
+        session.addError(LoxCompilerErrorCode::NumericLiteralParseFailure, line, line.substr(0, endOfNumLiteral));
+        // clear the line, since we can't trust anything past this point
+        line = std::string_view{};
     }
     else
     {
-        session.addError(LoxCompilerErrorCode::NumericLiteralConversionFailure, line, line.substr(0, endOfNumLiteral));
-        line = std::string_view{};
+        session.addNumLiteralToken(line, convertedLiteral, endOfNumLiteral);
     }
 }
 
